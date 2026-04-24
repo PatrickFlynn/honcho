@@ -52,7 +52,6 @@ dev = [
     "basedpyright>=1.29.4",
     "pre-commit>=4.2.0",
     "pytest-cov>=6.2.1",
-    "honcho-ai",
     "fakeredis>=2.32.0",
     "scipy>=1.15.3",
     "boto3>=1.42.5",
@@ -60,14 +59,7 @@ dev = [
 ]
 
 [tool.uv.workspace]
-members = [
-    "sdks/python",
-    "honcho-cli",
-]
-
-[tool.uv.sources]
-honcho-ai = { workspace = true }
-honcho-cli = { workspace = true }
+members = []
 
 [tool.ruff.lint]
 # from https://docs.astral.sh/ruff/linter/#rule-selection example
