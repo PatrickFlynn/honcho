@@ -300,6 +300,9 @@ def test_config_toml_example_uses_nested_model_config_sections() -> None:
     minimal_level = DialecticLevelSettings.model_validate(
         config_data["dialectic"]["levels"]["minimal"]
     )
+    low_level = DialecticLevelSettings.model_validate(
+        config_data["dialectic"]["levels"]["low"]
+    )
     max_level = DialecticLevelSettings.model_validate(
         config_data["dialectic"]["levels"]["max"]
     )
@@ -331,6 +334,8 @@ def test_config_toml_example_uses_nested_model_config_sections() -> None:
     assert deriver_config.thinking_budget_tokens is None
     assert minimal_level.MODEL_CONFIG.model == "gpt-5.4-mini"
     assert minimal_level.MODEL_CONFIG.transport == "openai"
+    assert minimal_level.TOOL_CHOICE == "auto"
+    assert low_level.TOOL_CHOICE == "auto"
     assert max_level.MODEL_CONFIG.model == "gpt-5.4-mini"
     assert max_level.MODEL_CONFIG.transport == "openai"
     assert max_level.MODEL_CONFIG.thinking_budget_tokens is None
@@ -350,6 +355,8 @@ def test_env_template_uses_nested_model_config_keys() -> None:
     assert "EMBEDDING_VECTOR_DIMENSIONS" in env_template
     assert "DERIVER_MODEL_CONFIG__MODEL" in env_template
     assert "DIALECTIC_LEVELS__minimal__MODEL_CONFIG__MODEL" in env_template
+    assert "DIALECTIC_LEVELS__minimal__TOOL_CHOICE=auto" in env_template
+    assert "DIALECTIC_LEVELS__low__TOOL_CHOICE=auto" in env_template
     assert "SUMMARY_MODEL_CONFIG__MODEL" in env_template
     assert "DREAM_DEDUCTION_MODEL_CONFIG__MODEL" in env_template
 
@@ -508,3 +515,50 @@ def test_dialectic_level_transport_override_drops_default_thinking_params(
     assert minimal_mc["model"] == "gpt-4.1-mini"
     assert "thinking_budget_tokens" not in minimal_mc
     assert "thinking_effort" not in minimal_mc
+
+
+def test_dialectic_settings_backfills_missing_levels(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Operators only need to override the levels they care about.
+
+    Env-var overrides replace the LEVELS dict wholesale (bypassing the
+    default_factory), so without a backfill the unmentioned levels would be
+    dropped and _validate_all_levels_present would fail.
+    """
+    from src.config import (
+        DialecticSettings,
+        _default_dialectic_levels,  # pyright: ignore[reportPrivateUsage]
+    )
+
+    for key in list(os.environ):
+        if key.startswith("DIALECTIC_LEVELS"):
+            monkeypatch.delenv(key)
+
+    settings = DialecticSettings(
+        LEVELS={  # pyright: ignore[reportArgumentType]
+            "low": {
+                "MODEL_CONFIG": {
+                    "transport": "anthropic",
+                    "model": "claude-haiku-4-5-20251001",
+                    "thinking_budget_tokens": 1024,
+                },
+                "MAX_OUTPUT_TOKENS": 2500,
+            }
+        }
+    )
+
+    assert set(settings.LEVELS.keys()) == {"minimal", "low", "medium", "high", "max"}
+    assert settings.LEVELS["low"].MODEL_CONFIG.transport == "anthropic"
+    assert settings.LEVELS["low"].MODEL_CONFIG.model == "claude-haiku-4-5-20251001"
+    assert settings.LEVELS["low"].MAX_OUTPUT_TOKENS == 2500
+    # Backfilled levels come from _default_dialectic_levels()
+    defaults = _default_dialectic_levels()
+    assert (
+        settings.LEVELS["minimal"].MAX_TOOL_ITERATIONS
+        == defaults["minimal"].MAX_TOOL_ITERATIONS
+    )
+    assert (
+        settings.LEVELS["max"].MAX_TOOL_ITERATIONS
+        == defaults["max"].MAX_TOOL_ITERATIONS
+    )

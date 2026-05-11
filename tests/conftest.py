@@ -481,11 +481,11 @@ def mock_openai_embeddings(request: pytest.FixtureRequest):
 
         # Mock the batch_embed method to return content-dependent embeddings
         async def mock_batch_embed_func(
-            id_resource_dict: dict[str, tuple[str, list[int]]],
+            id_resource_dict: dict[str, str],
         ) -> dict[str, list[list[float]]]:
             return {
-                text_id: [_content_to_embedding(resource[0])]
-                for text_id, resource in id_resource_dict.items()
+                text_id: [_content_to_embedding(content)]
+                for text_id, content in id_resource_dict.items()
             }
 
         mock_batch_embed.side_effect = mock_batch_embed_func
@@ -799,6 +799,7 @@ def mock_tracked_db(request: pytest.FixtureRequest):
         patch("src.utils.search.tracked_db", mock_tracked_db_context),
         patch("src.crud.document.tracked_db", mock_tracked_db_context),
         patch("src.crud.message.tracked_db", mock_tracked_db_context),
+        patch("src.reconciler.sync_vectors.tracked_db", mock_tracked_db_context),
         patch("src.dialectic.core.tracked_db", mock_tracked_db_context),
         patch("src.dreamer.specialists.tracked_db", mock_tracked_db_context),
         patch("src.dreamer.surprisal.tracked_db", mock_tracked_db_context),

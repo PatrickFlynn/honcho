@@ -731,7 +731,10 @@ class DeriverSettings(HonchoSettings):
 
     LOG_OBSERVATIONS: bool = False
 
-    MAX_INPUT_TOKENS: Annotated[int, Field(default=23000, gt=0, le=23000)] = 23000
+    MAX_INPUT_TOKENS: Annotated[int, Field(default=25000, gt=0, le=25000)] = 25000
+    MAX_CUSTOM_INSTRUCTIONS_TOKENS: Annotated[
+        int, Field(default=2000, ge=0, le=2000)
+    ] = 2000
 
     # Maximum number of observations to return in working representation
     # This is applied to both explicit and deductive observations
@@ -837,12 +840,12 @@ def _default_dialectic_levels() -> dict[ReasoningLevel, DialecticLevelSettings]:
             MODEL_CONFIG=_default_model_config(),
             MAX_TOOL_ITERATIONS=1,
             MAX_OUTPUT_TOKENS=250,
-            TOOL_CHOICE="any",
+            TOOL_CHOICE="auto",
         ),
         "low": DialecticLevelSettings(
             MODEL_CONFIG=_default_model_config(),
             MAX_TOOL_ITERATIONS=5,
-            TOOL_CHOICE="any",
+            TOOL_CHOICE="auto",
         ),
         "medium": DialecticLevelSettings(
             MODEL_CONFIG=_default_model_config(),
@@ -926,6 +929,10 @@ class DialecticSettings(HonchoSettings):
                                     del base_mc[k]
                         level_override[mc_key] = {**base_mc, **override_mc}
                 levels_raw[level_name] = {**base, **level_override}
+        # Backfill any reasoning levels the operator didn't explicitly set with the default values.
+        for default_level_name, default_level in defaults.items():
+            if default_level_name not in levels_raw:
+                levels_raw[default_level_name] = default_level.model_dump(by_alias=True)
         return data  # pyright: ignore[reportUnknownVariableType]
 
     @model_validator(mode="after")
